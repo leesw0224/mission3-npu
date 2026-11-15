@@ -3,7 +3,7 @@ import time
 
 # EPSILON: 부동소수점 오차 허용 임계값 (1e-9)
 # 두 필터의 유사도 차이가 EPSILON 미만이면 동점(UNDECIDED)으로 처리
-# 이를 통해 부동소수점 연산의 미세한 오차로 인한 오판정을 방지
+# IEEE 754 부동소수점 연산의 미세한 오차로 인한 오판정을 방지하기 위해 설정
 EPSILON = 1e-9
 
 
@@ -12,14 +12,30 @@ def normalize_label(label: str) -> str:
     라벨 정규화 함수: 다양한 형태의 입력 라벨을 표준 형식으로 변환
     - 'cross', '+' -> 'Cross' (십자 필터)
     - 'x', 'diag'  -> 'X'     (대각 필터)
-    대소문자·별칭 등 다양한 입력을 일관된 형식으로 변환하여 정확한 비교를 보장
+    대소문자·별칭 등 다양한 입력을 일관된 형식으로 변환하여 정확한 비교를 보장.
+    새로운 별칭 추가 시: cleaned in [...] 목록에 추가하면 됩니다.
     """
     cleaned = label.strip().lower()
     if cleaned in ["cross", "+"]:
         return "Cross"
-    if cleaned in ["x", "diag"]:
+    if cleaned in ["x", "diag", "diagonal"]:
         return "X"
     return label.strip()
+
+
+def normalize_filter_key(key: str) -> str:
+    """
+    필터 키 정규화 함수: data.json의 필터 키를 소문자 표준 형식으로 변환
+    - 'Cross', 'CROSS', 'cross', '+' -> 'cross'
+    - 'X', 'x', 'diagonal', 'diag'  -> 'x'
+    data.json 필터 키가 다양한 표기로 작성되어도 올바르게 매칭됩니다.
+    """
+    cleaned = key.strip().lower()
+    if cleaned in ["cross", "+"]:
+        return "cross"
+    if cleaned in ["x", "diag", "diagonal"]:
+        return "x"
+    return cleaned
 
 
 def mac_calculation(matrix_a, matrix_b):
@@ -44,7 +60,7 @@ def benchmark_mac(matrix_a, matrix_b, iterations=10):
     """
     MAC 연산 성능 벤치마크 함수
     - I/O를 제외한 순수 MAC 연산 구간만 time.perf_counter로 측정
-    - iterations회 반복 측정 후 평균 연산 시간(초)을 반환
+    - iterations=10회 반복 측정 후 평균 연산 시간(초)을 반환
     - 10회 반복 평균으로 측정 오차를 최소화
     """
     start_time = time.perf_counter()   # 연산 시작 시각 (I/O 제외)
@@ -101,7 +117,7 @@ def run_mode_1():
     """
     모드 1: 사용자 입력 기반 3x3 시뮬레이션
     - 필터 A(Cross), 필터 B(X), 입력 패턴을 직접 입력받아 MAC 연산 수행
-    - 10회 반복 측정 평균 연산 시간(µs) 출력
+    - 10회 반복 측정 평균 연산 시간(ms) 출력
     - EPSILON 기준 동점 처리(UNDECIDED) 포함
     """
     print("\n==========================================")
@@ -124,8 +140,8 @@ def run_mode_1():
         predicted = "X"
 
     print("\n---------------- [분석 결과] ----------------")
-    print(f"필터 A (Cross) 유사도: {sim_a:.2f} (10회 평균 연산시간: {time_a * 1e6:.2f} µs)")
-    print(f"필터 B (X)     유사도: {sim_b:.2f} (10회 평균 연산시간: {time_b * 1e6:.2f} µs)")
+    print(f"필터 A (Cross) 유사도: {sim_a:.2f} (10회 평균 연산시간: {time_a * 1e3:.4f} ms)")
+    print(f"필터 B (X)     유사도: {sim_b:.2f} (10회 평균 연산시간: {time_b * 1e3:.4f} ms)")
     print(f"판정 결과: {predicted}")
     if predicted == "UNDECIDED":
         print("  ※ 유사도 차이가 EPSILON(1e-9) 이하이므로 동점(UNDECIDED)으로 판정되었습니다.")
@@ -137,7 +153,7 @@ def run_mode_2():
     모드 2: data.json 자동 로드 및 종합 분석
     [1] 필터 로드 (3x3 ~ 25x25)
     [2] 패턴별 분류 및 PASS/FAIL 검증 (UNDECIDED는 FAIL로 집계)
-    [3] 크기별 MAC 연산 성능 분석표 (10회 반복 평균, O(N²) 연산 횟수)
+    [3] 크기별 MAC 연산 성능 분석표 (10회 반복 평균, O(N²) 연산 횟수, ms 단위)
     [4] 결과 요약 (총 패턴수, PASS/FAIL 집계, 실패 원인 분석)
     """
     print("\n==========================================")
@@ -171,9 +187,11 @@ def run_mode_2():
         expected = normalize_label(expected_raw)  # 라벨 정규화 적용
         p_matrix = p["data"]
 
-        # 크기 N에 따라 동적으로 필터 선택 (size_3, size_5, size_13, size_25)
-        f_cross = filters[f"size_{size}"]["cross"]
-        f_x = filters[f"size_{size}"]["x"]
+        # 필터 키 정규화 후 동적으로 필터 선택 (normalize_filter_key로 대소문자·별칭 처리)
+        key_cross = normalize_filter_key("cross")
+        key_x = normalize_filter_key("x")
+        f_cross = filters[f"size_{size}"][key_cross]
+        f_x = filters[f"size_{size}"][key_x]
 
         sim_c, sim_x, predicted = classify_pattern(
             p_matrix, f_cross, f_x, label_a="Cross", label_b="X"
@@ -196,26 +214,27 @@ def run_mode_2():
         _, avg_t = benchmark_mac(p_matrix, f_cross, iterations=10)
         size_stats[size].append(avg_t)
 
-    # [3] 크기별 MAC 연산 성능 분석 (O(N²) 시간복잡도 검증)
+    # [3] 크기별 MAC 연산 성능 분석 (O(N²) 시간복잡도 검증, ms 단위)
     print("\n[3] 크기별 MAC 연산 성능 분석 (10회 반복 측정 평균):")
-    print("-" * 55)
-    print(f"{'크기':<10}{'MAC 연산 횟수(N²)':<20}{'평균 연산 시간(µs)':<18}")
-    print("-" * 55)
+    print("-" * 58)
+    print(f"{'크기':<10}{'MAC 연산 횟수(N²)':<20}{'평균 연산 시간(ms)':<18}")
+    print("-" * 58)
     for sz in sorted(size_stats.keys()):
         mac_count = sz * sz  # O(N²): 연산 횟수는 N²에 비례
-        avg_time_us = (sum(size_stats[sz]) / len(size_stats[sz])) * 1e6
-        print(f"{sz}x{sz:<7}{mac_count:<20}{avg_time_us:<18.2f}")
-    print("-" * 55)
+        avg_time_ms = (sum(size_stats[sz]) / len(size_stats[sz])) * 1e3  # 초 → ms 변환
+        print(f"{sz}x{sz:<7}{mac_count:<20}{avg_time_ms:<18.4f}")
+    print("-" * 58)
 
     # [4] 결과 요약
     total_patterns = len(results)
     pass_count = sum(1 for r in results if r["pass"])
     fail_count = total_patterns - pass_count  # UNDECIDED 포함 FAIL 집계
+    undecided_count = sum(1 for r in results if r["predicted"] == "UNDECIDED")
 
     print("\n[4] 결과 요약:")
     print(f"  - 총 패턴 수: {total_patterns}개")
     print(f"  - 성공 (PASS): {pass_count}개")
-    print(f"  - 실패 (FAIL): {fail_count}개 (UNDECIDED 포함)")
+    print(f"  - 실패 (FAIL): {fail_count}개 (UNDECIDED {undecided_count}개 포함)")
     print(f"  - 일치율: {(pass_count / total_patterns) * 100:.1f}%")
 
     if fail_count > 0:
@@ -232,8 +251,8 @@ def run_mode_2():
 def main():
     """
     Mini NPU Simulator 메인 함수
-    - 모드 1: 사용자 직접 입력 (3x3)
-    - 모드 2: data.json 자동 분석 (3x3 ~ 25x25)
+    - 모드 1: 사용자 직접 입력 (3x3), 연산 시간 ms 단위 출력
+    - 모드 2: data.json 자동 분석 (3x3 ~ 25x25), 크기별 성능표 ms 단위 출력
     """
     print("=" * 45)
     print("     Mini NPU Simulator (CS Mission 3)     ")

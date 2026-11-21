@@ -1,0 +1,103 @@
+{
+  "filters": {
+    "size_3": {
+      "Cross": [
+        [0, 1, 0],
+        [1, 1, 1],
+        [0, 1, 0]
+      ],
+      "X": [
+        [1, 0, 1],
+        [0, 1, 0],
+        [1, 0, 1]
+      ]
+    }
+  },
+  "patterns": [
+    {
+      "name": "ok_3_cross",
+      "size": 3,
+      "expected": "+",
+      "data": [
+        [0, 1, 0],
+        [1, 1, 1],
+        [0, 1, 0]
+      ]
+    },
+    {
+      "name": "data_missing_expected",
+      "size": 3,
+      "data": [
+        [0, 1, 0],
+        [1, 1, 1],
+        [0, 1, 0]
+      ]
+    },
+    {
+      "name": "data_size_mismatch",
+      "size": 3,
+      "expected": "Cross",
+      "data": [
+        [0, 0, 1, 0, 0],
+        [0, 0, 1, 0, 0],
+        [1, 1, 1, 1, 1],
+        [0, 0, 1, 0, 0],
+        [0, 0, 1, 0, 0]
+      ]
+    },
+    {
+      "name": "data_unknown_label",
+      "size": 3,
+      "expected": "circle",
+      "data": [
+        [1, 0, 1],
+        [0, 1, 0],
+        [1, 0, 1]
+      ]
+    },
+    {
+      "name": "data_no_filter_size_7",
+      "size": 7,
+      "expected": "X",
+      "data": [
+        [1, 0, 0, 0, 0, 0, 1],
+        [0, 1, 0, 0, 0, 1, 0],
+        [0, 0, 1, 0, 1, 0, 0],
+        [0, 0, 0, 1, 0, 0, 0],
+        [0, 0, 1, 0, 1, 0, 0],
+        [0, 1, 0, 0, 0, 1, 0],
+        [1, 0, 0, 0, 0, 0, 1]
+      ]
+    },
+    {
+      "name": "data_not_number",
+      "size": 3,
+      "expected": "X",
+      "data": [
+        [1, 0, 1],
+        [0, "a", 0],
+        [1, 0, 1]
+      ]
+    },
+    {
+      "name": "numeric_exact_tie",
+      "size": 3,
+      "expected": "Cross",
+      "data": [
+        [1, 0, 0],
+        [0, 0, 1],
+        [0, 0, 0]
+      ]
+    },
+    {
+      "name": "numeric_float_tie",
+      "size": 3,
+      "expected": "Cross",
+      "data": [
+        [0.1, 0.9, 0.1],
+        [0, 0, 0],
+        [0.4, 0, 0.3]
+      ]
+    }
+  ]
+}
